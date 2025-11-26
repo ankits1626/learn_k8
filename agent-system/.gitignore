@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+vendor/
+
+# Build outputs
+build/
+dist/
+*.exe
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Environment
+.env
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
