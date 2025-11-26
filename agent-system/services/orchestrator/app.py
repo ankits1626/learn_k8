@@ -31,12 +31,17 @@ class TaskRequest(BaseModel):
     priority: int = 1
 
 
+class Subtask(BaseModel):
+    subtask_id: str
+    description: str
+
+
 class TaskResponse(BaseModel):
     task_id: str
     description: str
     status: str
     created_at: str
-    subtasks: list[str]
+    subtasks: list[Subtask]
 
 
 @app.get("/health")
@@ -71,6 +76,7 @@ def create_task(task: TaskRequest):
 
     # Break task into subtasks (simplified logic)
     subtasks = _generate_subtasks(task.description)
+    print(f"🔧 Generated {len(subtasks)} subtasks: {subtasks}")
 
     # Create task object
     task_obj = {
@@ -81,11 +87,15 @@ def create_task(task: TaskRequest):
         "created_at": created_at,
         "subtasks": ",".join(subtasks)  # Convert list to comma-separated string
     }
+    print(f"🔧 Task object created: {task_obj}")
 
     # Store task in Redis hash
+    print(f"🔧 Storing task in Redis: task:{task_id}")
     redis_client.hset(f"task:{task_id}", mapping=task_obj)
+    print(f"🔧 Task stored successfully")
 
     # Queue each subtask for workers
+    print(f"🔧 Queuing {len(subtasks)} jobs to work_queue")
     for idx, subtask in enumerate(subtasks):
         job = {
             "task_id": task_id,
@@ -93,16 +103,24 @@ def create_task(task: TaskRequest):
             "description": subtask,
             "priority": task.priority
         }
+        print(f"🔧 Pushing job {idx}: {job}")
         redis_client.lpush("work_queue", json.dumps(job))
+        print(f"🔧 Job {idx} pushed successfully")
 
     print(f"📋 Created task {task_id} with {len(subtasks)} subtasks")
+
+    # Build subtask objects with IDs
+    subtask_objects = [
+        {"subtask_id": f"{task_id}-{idx}", "description": subtask}
+        for idx, subtask in enumerate(subtasks)
+    ]
 
     return TaskResponse(
         task_id=task_id,
         description=task.description,
         status="queued",
         created_at=created_at,
-        subtasks=subtasks
+        subtasks=subtask_objects
     )
 
 
@@ -117,12 +135,21 @@ def get_task(task_id: str):
     if not task_data:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    # Parse comma-separated subtasks back into list
+    subtasks_list = task_data.get("subtasks", "").split(",")
+
+    # Reconstruct subtask objects with IDs
+    subtask_objects = [
+        {"subtask_id": f"{task_id}-{idx}", "description": subtask}
+        for idx, subtask in enumerate(subtasks_list) if subtask
+    ]
+
     return TaskResponse(
         task_id=task_data["task_id"],
         description=task_data["description"],
         status=task_data["status"],
         created_at=task_data["created_at"],
-        subtasks=task_data.get("subtasks", "").split(",")
+        subtasks=subtask_objects
     )
 
 

@@ -1,0 +1,19 @@
+services:
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev  # Use dev Dockerfile with Air for live reload
+    container_name: agent-worker
+    environment:
+      - REDIS_HOST=agent-redis  # Connects to external Redis via Docker DNS
+      - REDIS_PORT=6379
+      - WORKER_ID=worker-1
+    volumes:
+      - .:/app  # Mount source code for live reload
+    networks:
+      - agent-system-net
+    restart: unless-stopped
+
+networks:
+  agent-system-net:
+    external: true
